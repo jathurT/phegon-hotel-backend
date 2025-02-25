@@ -1,4 +1,4 @@
-FROM openjdk:21-jdk-slim
+FROM openjdk:17-jdk-slim
 
 # Install netcat-openbsd (instead of generic netcat) and curl for health checks
 RUN apt-get update && apt-get install -y netcat-openbsd curl && rm -rf /var/lib/apt/lists/*

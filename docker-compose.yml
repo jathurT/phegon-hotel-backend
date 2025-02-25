@@ -4,7 +4,6 @@ services:
   backend:
     env_file:
       - .env
-    build: .
     image: jathurt/myapp-backend-hotel-bookings:latest
     container_name: myapp-backend-hotel
     ports:
