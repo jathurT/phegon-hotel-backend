@@ -117,7 +117,7 @@ EOL
                     "DOCKER_USERNAME=${DOCKER_CREDENTIALS_USR}",
                     "DOCKER_PASSWORD=${DOCKER_CREDENTIALS_PSW}"
                 ]) {
-                    sshagent(['ec2-ssh-key']) {
+                    sshagent(['ec2-ssh-key-hotel']) {
                         sh '''
                             # Create deployment directory
                             echo "Creating deployment directory..."
