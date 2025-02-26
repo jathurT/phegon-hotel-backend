@@ -92,6 +92,246 @@ EOL
             }
         }
 
+        stage('Check Monitoring Directories') {
+            steps {
+                script {
+                    sh '''
+                        # Check if prometheus and grafana directories exist, create if they don't
+                        if [ ! -d "prometheus" ]; then
+                            mkdir -p prometheus
+                            echo "Created prometheus directory"
+                        fi
+
+                        if [ ! -d "grafana/provisioning/dashboards" ]; then
+                            mkdir -p grafana/provisioning/dashboards
+                            echo "Created grafana dashboards directory"
+                        fi
+
+                        if [ ! -d "grafana/provisioning/datasources" ]; then
+                            mkdir -p grafana/provisioning/datasources
+                            echo "Created grafana datasources directory"
+                        fi
+
+                        # Verify the directories were created successfully
+                        ls -la prometheus/
+                        ls -la grafana/provisioning/dashboards/
+                        ls -la grafana/provisioning/datasources/
+                    '''
+                }
+            }
+        }
+
+        stage('Prepare Monitoring Files') {
+            steps {
+                script {
+                    sh '''
+                        # Create a basic prometheus.yml if it doesn't exist
+                        if [ ! -f "prometheus/prometheus.yml" ]; then
+                            cat > prometheus/prometheus.yml << EOL
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'spring-actuator'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['backend:${SERVER_PORT}']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+EOL
+                            echo "Created prometheus.yml"
+                        fi
+
+                        # Create a basic Grafana datasource configuration if it doesn't exist
+                        if [ ! -f "grafana/provisioning/datasources/prometheus.yml" ]; then
+                            cat > grafana/provisioning/datasources/prometheus.yml << EOL
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+EOL
+                            echo "Created Grafana datasource configuration"
+                        fi
+
+                        # Create a basic Grafana dashboard configuration if it doesn't exist
+                        if [ ! -f "grafana/provisioning/dashboards/dashboard.yml" ]; then
+                            cat > grafana/provisioning/dashboards/dashboard.yml << EOL
+apiVersion: 1
+
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    options:
+      path: /etc/grafana/provisioning/dashboards
+EOL
+                            echo "Created Grafana dashboard provider configuration"
+                        fi
+
+                        # Create a basic Grafana dashboard if it doesn't exist
+                        if [ ! -f "grafana/provisioning/dashboards/spring-boot.json" ]; then
+                            cat > grafana/provisioning/dashboards/spring-boot.json << EOL
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "hideControls": false,
+  "links": [],
+  "refresh": "5s",
+  "rows": [
+    {
+      "collapse": false,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fill": 1,
+          "id": 1,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "system_cpu_usage",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "CPU Usage",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "CPU Usage",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    }
+  ],
+  "schemaVersion": 14,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "timezone": "",
+  "title": "Spring Boot",
+  "version": 0
+}
+EOL
+                            echo "Created Grafana dashboard"
+                        fi
+
+                        # Verify files exist
+                        ls -la prometheus/
+                        ls -la grafana/provisioning/dashboards/
+                        ls -la grafana/provisioning/datasources/
+                    '''
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
