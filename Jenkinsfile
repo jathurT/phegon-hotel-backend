@@ -160,7 +160,7 @@ EOL
                             scp -o StrictHostKeyChecking=no grafana/provisioning/dashboards/booking_dashboard.json $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/
 
                             echo "Copying grafana datasource configurations..."
-                            scp -o StrictHostKeyChecking=no grafana/provisioning/datasources/dashboard.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/
+                            scp -o StrictHostKeyChecking=no grafana/provisioning/datasources/datasource.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/
 
                             # Verify files on remote server
                             echo "Verifying remote files..."
