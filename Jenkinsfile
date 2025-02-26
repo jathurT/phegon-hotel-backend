@@ -127,19 +127,38 @@ EOL
                             echo "Copying deployment files..."
                             scp -o StrictHostKeyChecking=no docker-compose.yml .env $REMOTE_USER@$REMOTE_HOST:~/app-deployment/
 
-                            # Copy prometheus directory
-                            echo "Copying prometheus directory..."
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus/"
-                            scp -o StrictHostKeyChecking=no -r prometheus/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/
+                            # First check if the prometheus directory exists locally
+                            echo "Checking local prometheus directory..."
+                            ls -la prometheus/ || echo "Prometheus directory not found or empty"
 
-                            # Copy grafana directory
-                            echo "Copying grafana directory..."
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards ~/app-deployment/grafana/provisioning/datasources"
-                            scp -o StrictHostKeyChecking=no -r grafana/provisioning/dashboards/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/
-                            scp -o StrictHostKeyChecking=no -r grafana/provisioning/datasources/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/
+                            # Make sure the remote prometheus directory has correct permissions
+                            echo "Creating remote prometheus directory with correct permissions..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus/ && chmod 755 ~/app-deployment/prometheus/"
 
-                            # Set proper permissions for prometheus.yml
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "chmod 644 ~/app-deployment/prometheus/prometheus.yml"
+                            # Try copying the prometheus files with verbose output for debugging
+                            echo "Copying prometheus files with verbose output..."
+                            scp -v -o StrictHostKeyChecking=no -r prometheus/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/ || echo "Warning: Failed to copy some prometheus files"
+
+                            # First check if grafana directories exist locally
+                            echo "Checking local grafana directories..."
+                            ls -la grafana/provisioning/dashboards/ || echo "Grafana dashboards directory not found or empty"
+                            ls -la grafana/provisioning/datasources/ || echo "Grafana datasources directory not found or empty"
+
+                            # Make sure the remote grafana directories have correct permissions
+                            echo "Creating remote grafana directories with correct permissions..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards/ && chmod 755 ~/app-deployment/grafana/provisioning/dashboards/"
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/datasources/ && chmod 755 ~/app-deployment/grafana/provisioning/datasources/"
+
+                            # Try copying the grafana files with verbose output for debugging
+                            echo "Copying grafana dashboard files with verbose output..."
+                            scp -v -o StrictHostKeyChecking=no -r grafana/provisioning/dashboards/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/ || echo "Warning: Failed to copy some grafana dashboard files"
+
+                            echo "Copying grafana datasource files with verbose output..."
+                            scp -v -o StrictHostKeyChecking=no -r grafana/provisioning/datasources/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/ || echo "Warning: Failed to copy some grafana datasource files"
+
+                            # Set proper permissions for all configuration files
+                            echo "Setting proper permissions for configuration files..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "find ~/app-deployment/prometheus/ ~/app-deployment/grafana/ -type f -exec chmod 644 {} \\; || echo 'Some permission changes failed'"
 
                             # Execute deployment commands
                             echo "Starting deployment..."
@@ -156,7 +175,7 @@ EOL
                                 sudo docker-compose down --remove-orphans || true
 
                                 # Clean up old resources
-                                sudo docker rm -f $(sudo docker ps -a -q) 2>/dev/null || true
+                                sudo docker ps -aq | xargs sudo docker rm -f 2>/dev/null || true
                                 sudo docker network prune -f || true
 
                                 # Pull latest images
