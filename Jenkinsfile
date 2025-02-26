@@ -77,234 +77,23 @@ EOL
             steps {
                 script {
                     sh '''
-                        # Check if prometheus and grafana directories exist, create if they don't
+                        # Verify that the required directories exist
                         if [ ! -d "prometheus" ]; then
-                            mkdir -p prometheus
-                            echo "Created prometheus directory"
+                            echo "Error: prometheus directory not found in project"
+                            exit 1
                         fi
 
                         if [ ! -d "grafana/provisioning/dashboards" ]; then
-                            mkdir -p grafana/provisioning/dashboards
-                            echo "Created grafana dashboards directory"
+                            echo "Error: grafana/provisioning/dashboards directory not found in project"
+                            exit 1
                         fi
 
                         if [ ! -d "grafana/provisioning/datasources" ]; then
-                            mkdir -p grafana/provisioning/datasources
-                            echo "Created grafana datasources directory"
+                            echo "Error: grafana/provisioning/datasources directory not found in project"
+                            exit 1
                         fi
 
-                        # Verify the directories were created successfully
-                        ls -la prometheus/
-                        ls -la grafana/provisioning/dashboards/
-                        ls -la grafana/provisioning/datasources/
-                    '''
-                }
-            }
-        }
-
-        stage('Prepare Monitoring Files') {
-            steps {
-                script {
-                    sh '''
-                        # Create a basic prometheus.yml if it doesn't exist
-                        if [ ! -f "prometheus/prometheus.yml" ]; then
-                            cat > prometheus/prometheus.yml << EOL
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'spring-actuator'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['backend:${SERVER_PORT}']
-
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['node-exporter:9100']
-EOL
-                            echo "Created prometheus.yml"
-                        fi
-
-                        # Create a basic Grafana datasource configuration if it doesn't exist
-                        if [ ! -f "grafana/provisioning/datasources/prometheus.yml" ]; then
-                            cat > grafana/provisioning/datasources/prometheus.yml << EOL
-apiVersion: 1
-
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: true
-EOL
-                            echo "Created Grafana datasource configuration"
-                        fi
-
-                        # Create a basic Grafana dashboard configuration if it doesn't exist
-                        if [ ! -f "grafana/provisioning/dashboards/dashboard.yml" ]; then
-                            cat > grafana/provisioning/dashboards/dashboard.yml << EOL
-apiVersion: 1
-
-providers:
-  - name: 'Default'
-    orgId: 1
-    folder: ''
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 10
-    options:
-      path: /etc/grafana/provisioning/dashboards
-EOL
-                            echo "Created Grafana dashboard provider configuration"
-                        fi
-
-                        # Create a basic Grafana dashboard if it doesn't exist
-                        if [ ! -f "grafana/provisioning/dashboards/spring-boot.json" ]; then
-                            cat > grafana/provisioning/dashboards/spring-boot.json << EOL
-{
-  "annotations": {
-    "list": []
-  },
-  "editable": true,
-  "gnetId": null,
-  "graphTooltip": 0,
-  "hideControls": false,
-  "links": [],
-  "refresh": "5s",
-  "rows": [
-    {
-      "collapse": false,
-      "height": "250px",
-      "panels": [
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "Prometheus",
-          "fill": 1,
-          "id": 1,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "span": 12,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "expr": "system_cpu_usage",
-              "format": "time_series",
-              "intervalFactor": 2,
-              "legendFormat": "CPU Usage",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "CPU Usage",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ]
-        }
-      ],
-      "repeat": null,
-      "repeatIteration": null,
-      "repeatRowId": null,
-      "showTitle": false,
-      "title": "Dashboard Row",
-      "titleSize": "h6"
-    }
-  ],
-  "schemaVersion": 14,
-  "style": "dark",
-  "tags": [],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-15m",
-    "to": "now"
-  },
-  "timepicker": {
-    "refresh_intervals": [
-      "5s",
-      "10s",
-      "30s",
-      "1m",
-      "5m",
-      "15m",
-      "30m",
-      "1h",
-      "2h",
-      "1d"
-    ],
-    "time_options": [
-      "5m",
-      "15m",
-      "1h",
-      "6h",
-      "12h",
-      "24h",
-      "2d",
-      "7d",
-      "30d"
-    ]
-  },
-  "timezone": "",
-  "title": "Spring Boot",
-  "version": 0
-}
-EOL
-                            echo "Created Grafana dashboard"
-                        fi
-
-                        # Verify files exist
+                        # Verify the directories contents
                         ls -la prometheus/
                         ls -la grafana/provisioning/dashboards/
                         ls -la grafana/provisioning/datasources/
@@ -340,39 +129,74 @@ EOL
                 ]) {
                     sshagent(['ec2-ssh-key-hotel']) {
                         sh '''
-                            # Ensure remote directories exist with correct permissions
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus && chmod 755 ~/app-deployment/prometheus"
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards && chmod 755 ~/app-deployment/grafana/provisioning/dashboards"
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/datasources && chmod 755 ~/app-deployment/grafana/provisioning/datasources"
+                            set -e  # Exit on any error
 
-                            # Verify directories were created successfully
+                            echo "Preparing deployment on ${REMOTE_USER}@${REMOTE_HOST}..."
+
+                            # Create and verify remote directory structure
+                            echo "Creating remote directories..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus"
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards"
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/datasources"
+
+                            # Ensure proper permissions on remote directories
+                            echo "Setting permissions on remote directories..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "chmod -R 755 ~/app-deployment"
+
+                            # List directories to verify
+                            echo "Verifying remote directories..."
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "ls -la ~/app-deployment/"
 
-                            # Copy deployment files
+                            # Copy main config files
+                            echo "Copying docker-compose.yml and .env..."
                             scp -o StrictHostKeyChecking=no docker-compose.yml .env $REMOTE_USER@$REMOTE_HOST:~/app-deployment/
 
-                            # Copy prometheus.yml file individually
-                            scp -o StrictHostKeyChecking=no prometheus/prometheus.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/prometheus.yml
+                            # Copy the existing prometheus and grafana configuration files
+                            echo "Copying prometheus configuration..."
+                            scp -o StrictHostKeyChecking=no prometheus/prometheus.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/
 
-                            # Verify the file was copied successfully
+                            echo "Copying grafana dashboard configurations..."
+                            scp -o StrictHostKeyChecking=no grafana/provisioning/dashboards/dashboard.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/
+                            scp -o StrictHostKeyChecking=no grafana/provisioning/dashboards/booking_dashboard.json $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/
+
+                            echo "Copying grafana datasource configurations..."
+                            scp -o StrictHostKeyChecking=no grafana/provisioning/datasources/dashboard.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/
+
+                            # Verify files on remote server
+                            echo "Verifying remote files..."
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "ls -la ~/app-deployment/prometheus/"
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "ls -la ~/app-deployment/grafana/provisioning/dashboards/"
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "ls -la ~/app-deployment/grafana/provisioning/datasources/"
 
-                            # Docker deployment commands
+                            # Deploy the application
+                            echo "Deploying application..."
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST bash << 'EOF'
-                                cd ~/app-deployment
-                                sudo usermod -aG docker ubuntu
-                                echo "$DOCKER_PASSWORD" | sudo docker login --username "$DOCKER_USERNAME" --password-stdin
-                                sudo docker-compose down --remove-orphans || true
-                                sudo docker ps -aq | xargs sudo docker rm -f 2>/dev/null || true
-                                sudo docker network prune -f || true
-                                sudo docker-compose pull
-                                sudo docker-compose up -d
-                                if ! sudo docker-compose ps | grep -q "Up"; then
-                                    echo "Containers failed to start properly"
-                                    sudo docker-compose logs
-                                    exit 1
-                                fi
-                                echo "Deployment completed successfully!"
+cd ~/app-deployment
+echo "Current directory: $(pwd)"
+echo "Logging into Docker Hub..."
+echo "$DOCKER_PASSWORD" | sudo docker login --username "$DOCKER_USERNAME" --password-stdin
+
+echo "Stopping existing services..."
+sudo docker-compose down --remove-orphans || true
+
+echo "Cleaning up any stale containers..."
+sudo docker ps -aq | xargs sudo docker rm -f 2>/dev/null || true
+sudo docker network prune -f || true
+
+echo "Pulling latest images..."
+sudo docker-compose pull
+
+echo "Starting services..."
+sudo docker-compose up -d
+
+echo "Checking if services started successfully..."
+if ! sudo docker-compose ps | grep -q "Up"; then
+    echo "Containers failed to start properly"
+    sudo docker-compose logs
+    exit 1
+fi
+
+echo "Deployment completed successfully!"
 EOF
                         '''
                     }
