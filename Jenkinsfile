@@ -345,14 +345,17 @@ EOL
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards && chmod 755 ~/app-deployment/grafana/provisioning/dashboards"
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/datasources && chmod 755 ~/app-deployment/grafana/provisioning/datasources"
 
+                            # Verify directories were created successfully
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "ls -la ~/app-deployment/"
+
                             # Copy deployment files
                             scp -o StrictHostKeyChecking=no docker-compose.yml .env $REMOTE_USER@$REMOTE_HOST:~/app-deployment/
-                            scp -o StrictHostKeyChecking=no -r prometheus/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/
-                            scp -o StrictHostKeyChecking=no -r grafana/provisioning/dashboards/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/
-                            scp -o StrictHostKeyChecking=no -r grafana/provisioning/datasources/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/
 
-                            # Ensure proper permissions on copied files
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "find ~/app-deployment/prometheus ~/app-deployment/grafana -type f -exec chmod 644 {} \\;"
+                            # Copy prometheus.yml file individually
+                            scp -o StrictHostKeyChecking=no prometheus/prometheus.yml $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/prometheus.yml
+
+                            # Verify the file was copied successfully
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "ls -la ~/app-deployment/prometheus/"
 
                             # Docker deployment commands
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST bash << 'EOF'
