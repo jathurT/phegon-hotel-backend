@@ -133,11 +133,20 @@ EOL
 
                             echo "Preparing deployment on ${REMOTE_USER}@${REMOTE_HOST}..."
 
-                            # Create and verify remote directory structure
-                            echo "Creating remote directories..."
+                            # First check and clean existing deployment directory if needed
+                            echo "Checking and cleaning existing directories if needed..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "sudo rm -rf ~/app-deployment || true"
+
+                            # Create remote directory structure with proper permissions
+                            echo "Creating remote directories with proper permissions..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment"
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus"
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards"
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/datasources"
+
+                            # Ensure the ubuntu user owns all these directories
+                            echo "Setting ownership of remote directories..."
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "sudo chown -R $REMOTE_USER:$REMOTE_USER ~/app-deployment"
 
                             # Ensure proper permissions on remote directories
                             echo "Setting permissions on remote directories..."
