@@ -52,7 +52,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
     networks:
-      - myapp-network
+      - myapp-network-hotel
     restart: unless-stopped
 
   grafana:
@@ -68,7 +68,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
     networks:
-      - myapp-network
+      - myapp-network-hotel
     depends_on:
       - prometheus
     restart: unless-stopped
