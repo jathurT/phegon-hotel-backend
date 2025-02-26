@@ -129,14 +129,17 @@ EOL
 
                             # Copy prometheus directory
                             echo "Copying prometheus directory..."
-                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus"
-                            scp -o StrictHostKeyChecking=no -r prometheus/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheu
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/prometheus/"
+                            scp -o StrictHostKeyChecking=no -r prometheus/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/prometheus/
 
                             # Copy grafana directory
                             echo "Copying grafana directory..."
                             ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "mkdir -p ~/app-deployment/grafana/provisioning/dashboards ~/app-deployment/grafana/provisioning/datasources"
                             scp -o StrictHostKeyChecking=no -r grafana/provisioning/dashboards/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/dashboards/
                             scp -o StrictHostKeyChecking=no -r grafana/provisioning/datasources/* $REMOTE_USER@$REMOTE_HOST:~/app-deployment/grafana/provisioning/datasources/
+
+                            # Set proper permissions for prometheus.yml
+                            ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "chmod 644 ~/app-deployment/prometheus/prometheus.yml"
 
                             # Execute deployment commands
                             echo "Starting deployment..."
@@ -161,8 +164,6 @@ EOL
 
                                 # Start containers
                                 sudo docker-compose up -d
-
-
 
                                 # Check container status
                                 if ! sudo docker-compose ps | grep -q "Up"; then
