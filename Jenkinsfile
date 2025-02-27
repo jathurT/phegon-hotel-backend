@@ -13,12 +13,14 @@ pipeline {
     }
 
     environment {
-        AWS_CREDENTIALS = credentials('aws-credentials-hotel')
+        AWS_CREDENTIALS = credentials('aws-credentials')
+        MAIL_CREDENTIALS = credentials('mail-credentials')
+        JWT_SECRET = credentials('jwt-secret')
         DB_CREDENTIALS = credentials('db-credentials')
         MYSQL_ROOT_PASSWORD = credentials('mysql-root-password')
         DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
-        DOCKER_IMAGE = "jathurt/myapp-backend-hotel-bookings"
-        EC2_HOST = credentials('ec2-host-hotel')
+        DOCKER_IMAGE = "jathurt/myapp-backend"
+        EC2_HOST = credentials('ec2-host')
         EC2_USER = 'ubuntu'
         DEPLOY_ENV = "${params.DEPLOY_ENV ?: 'staging'}"
         SERVER_PORT = "${params.SERVER_PORT}"
@@ -39,6 +41,25 @@ pipeline {
             }
         }
 
+        stage('Test') {
+            steps {
+                withEnv([
+                    'SPRING_PROFILES_ACTIVE=test',
+                    'SPRING_DATASOURCE_URL=jdbc:h2:mem:testdb',
+                    'SPRING_DATASOURCE_USERNAME=sa',
+                    'SPRING_DATASOURCE_PASSWORD=',
+                    'SPRING_JPA_HIBERNATE_DDL_AUTO=create-drop'
+                ]) {
+                    sh './mvnw test'
+                }
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
         stage('Prepare .env File') {
             steps {
                 script {
@@ -52,15 +73,30 @@ SERVER_PORT=${SERVER_PORT}
 MYSQL_PORT=${MYSQL_PORT}
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
 SPRING_JPA_HIBERNATE_DDL_AUTO=update
-SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/phegon_hotel_db
+SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/dental
 SPRING_DATASOURCE_USERNAME=${DB_CREDENTIALS_USR}
 SPRING_DATASOURCE_PASSWORD=${DB_CREDENTIALS_PSW}
 SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
 SPRING_JPA_SHOW_SQL=false
+APP_CORS_ALLOWED_ORIGINS=*
+APP_RESET_PASSWORD_LINK=http://myapp.com/reset-password
+SPRING_APP_JWTSECRET=${JWT_SECRET}
+SPRING_APP_JWTEXPIRATIONMS=86400000
+SPRING_APP_JWTCOOKIENAME=dn-dental-clinic
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=${MAIL_CREDENTIALS_USR}
+SPRING_MAIL_PASSWORD=${MAIL_CREDENTIALS_PSW}
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=5000
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
 AWS_ACCESSKEYID=${AWS_CREDENTIALS_USR}
 AWS_SECRETKEY=${AWS_CREDENTIALS_PSW}
 AWS_REGION=eu-north-1
-AWS_S3_BUCKET=phegon-hotel-images-jathur
+AWS_S3_BUCKET=patient-logbook-photos
 EOL
 
                         # Verify file was created successfully
@@ -217,9 +253,16 @@ EOF
     post {
         always {
             script {
+                // Clean up Docker resources
                 sh 'docker logout || true'
                 sh 'docker system prune -f || true'
-                sh 'rm -f .env || true'
+
+                // Remove sensitive files
+                sh '''
+                    rm -f .env
+                    rm -f get-docker.sh || true
+                '''
+
                 cleanWs()
             }
         }
