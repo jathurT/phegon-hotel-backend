@@ -13,7 +13,7 @@ pipeline {
     }
 
     environment {
-        AWS_CREDENTIALS = credentials('aws-credentials-hotel')
+        AWS_CREDENTIALS = credentials('aws-credentials')
         DB_CREDENTIALS = credentials('db-credentials')
         MYSQL_ROOT_PASSWORD = credentials('mysql-root-password')
         DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
