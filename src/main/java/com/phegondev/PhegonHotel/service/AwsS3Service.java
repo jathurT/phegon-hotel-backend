@@ -18,8 +18,8 @@ import java.io.InputStream;
 @Service
 public class AwsS3Service {
 
-    //    private final String bucketName = "phegon-hotel-images";
-    private final String bucketName = "phegon-hotel-images-jathur";
+    @Value("${aws.s3.bucket.name}")
+    private String bucketName ;
 
     @Value("${aws.s3.access.key}")
     private String awsS3AccessKey;
@@ -31,30 +31,29 @@ public class AwsS3Service {
     private String region;
 
     public String saveImageToS3(MultipartFile photo) {
-        String s3LocationImage = null;
-
         try {
-
             String s3Filename = photo.getOriginalFilename();
 
             BasicAWSCredentials awsCredentials = new BasicAWSCredentials(awsS3AccessKey, awsS3SecretKey);
             AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
-                    .withCredentials(new AWSStaticCredentialsProvider(awsCredentials))
-                    .withRegion(region)
-                    .build();
+                .withCredentials(new AWSStaticCredentialsProvider(awsCredentials))
+                .withRegion(region)
+                .build();
 
             InputStream inputStream = photo.getInputStream();
 
             ObjectMetadata metadata = new ObjectMetadata();
             metadata.setContentType("image/jpeg");
+            metadata.setContentLength(photo.getSize()); // Add content length
 
             PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, s3Filename, inputStream, metadata);
             s3Client.putObject(putObjectRequest);
-            return "https://" + bucketName + ".s3.amazonaws.com/" + s3Filename;
 
+            // Correct URL format with region
+            return "https://" + bucketName + ".s3." + region + ".amazonaws.com/" + s3Filename;
         } catch (Exception e) {
             e.printStackTrace();
-            throw new OurException("Unable to upload image to s3 bucket" + e.getMessage());
+            throw new OurException("Unable to upload image to s3 bucket: " + e.getMessage());
         }
     }
 }
