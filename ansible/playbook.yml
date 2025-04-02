@@ -54,6 +54,11 @@
         - "{{ app_dir }}/grafana/provisioning/datasources"
         - "/var/www/html"
 
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
     - name: Configure Nginx
       copy:
         dest: "{{ nginx_conf_path }}"
@@ -93,7 +98,7 @@
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
               proxy_set_header X-Forwarded-Proto $scheme;
             }
-            
+          
             # User frontend (root path)
             location / {
               root /var/www/html;
@@ -107,6 +112,19 @@
         src: "{{ nginx_conf_path }}"
         dest: /etc/nginx/sites-enabled/frontends
         state: link
+
+    # Add a check to confirm the default site is really gone
+    - name: Ensure no duplicate default server exists
+      command: grep -r "default_server" /etc/nginx/sites-enabled/
+      register: check_default
+      changed_when: false
+      failed_when: false
+
+    # Display diagnostic information if issues persist
+    - name: Display diagnostic information
+      debug:
+        msg: "Found default_server directives: {{ check_default.stdout_lines }}"
+      when: check_default.rc == 0
 
     - name: Test Nginx configuration
       shell: nginx -t
