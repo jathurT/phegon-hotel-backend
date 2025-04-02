@@ -101,7 +101,7 @@
           
             # User frontend (root path)
             location / {
-              root /var/www/html;
+              root /var/www/frontends;
               try_files $uri $uri/ /index.html;
               index index.html;
             }
@@ -147,4 +147,4 @@
         group: ubuntu
         mode: '0644'
       with_items:
-        - { path: "/var/www/html/index.html", content: "User Frontend Placeholder" }
+        - { path: "/var/www/frontends/index.html", content: "User Frontend Placeholder" }
