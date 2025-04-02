@@ -175,22 +175,24 @@ EOL
                     // Create Ansible files
                     writeFile file: "${ANSIBLE_DIR}/playbook.yml", text: readFile('./ansible/playbook.yml')
 
-                    // Create inventory file with dynamic EC2 IP
+                    // Create inventory file with dynamic EC2 IP - WITHOUT ssh key reference
                     def inventory_content = """[web_servers]
-webserver ansible_host=${EC2_HOST} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/ec2-connect.pem
+webserver ansible_host=${EC2_HOST} ansible_user=ubuntu
 """
                     writeFile file: "${ANSIBLE_DIR}/inventory.ini", text: inventory_content
 
-                    // Wait for SSH to be available
-                    sh """
-                        # Wait for SSH to be available
-                        echo "Waiting for SSH to become available on ${EC2_HOST}..."
-                        timeout 300 bash -c 'until ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-connect.pem ubuntu@${EC2_HOST} echo SSH is up; do sleep 5; done'
-                    """
+                    sshagent(['ec2-ssh-key']) {
+                        // Wait for SSH to be available
+                        sh """
+                            # Wait for SSH to become available
+                            echo "Waiting for SSH to become available on ${EC2_HOST}..."
+                            timeout 300 bash -c 'until ssh -o StrictHostKeyChecking=no ubuntu@${EC2_HOST} echo SSH is up; do sleep 5; done'
+                        """
 
-                    // Run Ansible playbook
-                    dir(ANSIBLE_DIR) {
-                        sh "ansible-playbook -i inventory.ini playbook.yml"
+                        // Run Ansible playbook with SSH agent
+                        dir(ANSIBLE_DIR) {
+                            sh "ansible-playbook -i inventory.ini playbook.yml"
+                        }
                     }
                 }
             }
