@@ -10,6 +10,7 @@ pipeline {
         choice(name: 'DEPLOY_ENV', choices: ['staging', 'production'], description: 'Select deployment environment')
         string(name: 'SERVER_PORT', defaultValue: '8081', description: 'Port for the application to run on EC2')
         string(name: 'MYSQL_PORT', defaultValue: '3306', description: 'Port for MySQL to run on EC2')
+        booleanParam(name: 'PROVISION_INFRASTRUCTURE', defaultValue: false, description: 'Provision new infrastructure with Terraform')
     }
 
     environment {
@@ -23,6 +24,8 @@ pipeline {
         DEPLOY_ENV = "${params.DEPLOY_ENV ?: 'staging'}"
         SERVER_PORT = "${params.SERVER_PORT}"
         MYSQL_PORT = "${params.MYSQL_PORT}"
+        TERRAFORM_DIR = "${WORKSPACE}/terraform"
+        ANSIBLE_DIR = "${WORKSPACE}/ansible"
     }
 
     stages {
@@ -116,6 +119,80 @@ EOL
                 sh 'echo $DOCKER_CREDENTIALS_PSW | docker login -u $DOCKER_CREDENTIALS_USR --password-stdin'
                 sh "docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}"
                 sh "docker push ${DOCKER_IMAGE}:latest"
+            }
+        }
+
+        stage('Provision Infrastructure') {
+            when {
+                expression { params.PROVISION_INFRASTRUCTURE == true }
+            }
+            steps {
+                script {
+                    // Create terraform directory if it doesn't exist
+                    sh "mkdir -p ${TERRAFORM_DIR}"
+
+                    // Create Terraform files
+                    writeFile file: "${TERRAFORM_DIR}/main.tf", text: readFile('path/to/main.tf')
+                    writeFile file: "${TERRAFORM_DIR}/variables.tf", text: readFile('path/to/variables.tf')
+
+                    // Initialize and apply Terraform
+                    dir(TERRAFORM_DIR) {
+                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                         credentialsId: 'aws-credentials',
+                                         accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                                         secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                            sh 'terraform init'
+                            sh 'terraform apply -auto-approve'
+
+                            // Capture the instance IP for Ansible
+                            def instance_ip = sh(script: 'terraform output -raw instance_public_ip', returnStdout: true).trim()
+
+                            // Store the instance IP for later use
+                            env.EC2_HOST = instance_ip
+
+                            // Update the Jenkins credential
+                            // Note: This is pseudo-code and may need to be adapted
+                            // withCredentials([string(credentialsId: 'ec2-host-hotel', variable: 'EC2_HOST_CRED')]) {
+                            //     // Update the credential with the new IP
+                            // }
+
+                            echo "New EC2 instance provisioned at IP: ${instance_ip}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Configure Infrastructure with Ansible') {
+            when {
+                expression { params.PROVISION_INFRASTRUCTURE == true }
+            }
+            steps {
+                script {
+                    // Create ansible directory if it doesn't exist
+                    sh "mkdir -p ${ANSIBLE_DIR}"
+
+                    // Create Ansible files
+                    writeFile file: "${ANSIBLE_DIR}/playbook.yml", text: readFile('path/to/playbook.yml')
+
+                    // Create inventory file with dynamic EC2 IP
+                    def inventory_content = """[web_servers]
+webserver ansible_host=${EC2_HOST} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/ec2-connect.pem
+"""
+                    writeFile file: "${ANSIBLE_DIR}/inventory.ini", text: inventory_content
+
+                    // Wait for SSH to be available
+                    sh """
+                        # Wait for SSH to be available
+                        echo "Waiting for SSH to become available on ${EC2_HOST}..."
+                        timeout 300 bash -c 'until ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2-connect.pem ubuntu@${EC2_HOST} echo SSH is up; do sleep 5; done'
+                    """
+
+                    // Run Ansible playbook
+                    dir(ANSIBLE_DIR) {
+                        sh "ansible-playbook -i inventory.ini playbook.yml"
+                    }
+                }
             }
         }
 
