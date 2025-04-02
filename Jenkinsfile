@@ -19,7 +19,7 @@ pipeline {
         MYSQL_ROOT_PASSWORD = credentials('mysql-root-password')
         DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
         DOCKER_IMAGE = "jathurt/myapp-backend-hotel-bookings"
-        EC2_HOST = credentials('ec2-host-hotel')
+//         EC2_HOST = credentials('ec2-host-hotel')
         EC2_USER = 'ubuntu'
         DEPLOY_ENV = "${params.DEPLOY_ENV ?: 'staging'}"
         SERVER_PORT = "${params.SERVER_PORT}"
