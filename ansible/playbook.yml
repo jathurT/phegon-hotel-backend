@@ -1,0 +1,132 @@
+---
+- name: Configure Web Application Server
+  hosts: web_servers
+  become: yes
+  vars:
+    app_dir: "/home/ubuntu/app-deployment"
+    nginx_conf_path: "/etc/nginx/sites-available/frontends"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - nginx
+        state: present
+
+    - name: Install Docker dependencies
+      shell: curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Install Docker Compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Create application directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+      with_items:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/prometheus"
+        - "{{ app_dir }}/grafana/provisioning/dashboards"
+        - "{{ app_dir }}/grafana/provisioning/datasources"
+        - "/var/www/html"
+
+    - name: Configure Nginx
+      copy:
+        dest: "{{ nginx_conf_path }}"
+        content: |
+          server {
+            listen 80 default_server;
+
+            # Backend API
+            location /api/ {
+              proxy_pass http://localhost:8081/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            # Grafana
+            location /grafana/ {
+              proxy_pass http://localhost:3000/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              # WebSocket support
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+              # Timeout settings
+              proxy_read_timeout 90s;
+            }
+
+            # Prometheus
+            location /prometheus/ {
+              proxy_pass http://localhost:9090/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # User frontend (root path)
+            location / {
+              root /var/www/html;
+              try_files $uri $uri/ /index.html;
+              index index.html;
+            }
+          }
+
+    - name: Enable Nginx site
+      file:
+        src: "{{ nginx_conf_path }}"
+        dest: /etc/nginx/sites-enabled/frontends
+        state: link
+
+    - name: Test Nginx configuration
+      shell: nginx -t
+      register: nginx_test
+      changed_when: false
+      failed_when: nginx_test.rc != 0
+
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded
+        enabled: yes
+      when: nginx_test.rc == 0
+
+    - name: Create placeholder HTML files
+      copy:
+        dest: "{{ item.path }}"
+        content: "<html><body><h1>{{ item.content }}</h1></body></html>"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+      with_items:
+        - { path: "/var/www/html/index.html", content: "User Frontend Placeholder" }
