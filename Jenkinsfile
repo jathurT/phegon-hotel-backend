@@ -132,8 +132,8 @@ EOL
                     sh "mkdir -p ${TERRAFORM_DIR}"
 
                     // Create Terraform files
-                    writeFile file: "${TERRAFORM_DIR}/main.tf", text: readFile('path/to/main.tf')
-                    writeFile file: "${TERRAFORM_DIR}/variables.tf", text: readFile('path/to/variables.tf')
+                    writeFile file: "${TERRAFORM_DIR}/main.tf", text: readFile('./terraform/main.tf')
+                    writeFile file: "${TERRAFORM_DIR}/variables.tf", text: readFile('./terraform/variables.tf')
 
                     // Initialize and apply Terraform
                     dir(TERRAFORM_DIR) {
@@ -173,7 +173,7 @@ EOL
                     sh "mkdir -p ${ANSIBLE_DIR}"
 
                     // Create Ansible files
-                    writeFile file: "${ANSIBLE_DIR}/playbook.yml", text: readFile('path/to/playbook.yml')
+                    writeFile file: "${ANSIBLE_DIR}/playbook.yml", text: readFile('./ansible/playbook.yml')
 
                     // Create inventory file with dynamic EC2 IP
                     def inventory_content = """[web_servers]
