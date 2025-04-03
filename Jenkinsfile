@@ -45,11 +45,17 @@ pipeline {
         stage('Prepare .env File') {
             steps {
                 script {
-                    sh '''
-                        # Create .env file with secure permissions
-                        touch .env && chmod 600 .env
+                    withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                         credentialsId: 'aws-credentials',
+                         accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                         secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']
+                    ]) {
+                        sh '''
+                            # Create .env file with secure permissions
+                            touch .env && chmod 600 .env
 
-                        cat > .env << EOL
+                            cat > .env << EOL
 SPRING_APPLICATION_NAME=backend
 SERVER_PORT=${SERVER_PORT}
 MYSQL_PORT=${MYSQL_PORT}
@@ -60,18 +66,13 @@ SPRING_DATASOURCE_USERNAME=${DB_CREDENTIALS_USR}
 SPRING_DATASOURCE_PASSWORD=${DB_CREDENTIALS_PSW}
 SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
 SPRING_JPA_SHOW_SQL=false
-AWS_ACCESSKEYID=${AWS_CREDENTIALS_USR}
-AWS_SECRETKEY=${AWS_CREDENTIALS_PSW}
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=eu-north-1
 AWS_S3_BUCKET=phegon-hotel-images-jathur
 EOL
-
-                        # Verify file was created successfully
-                        if [ ! -f .env ]; then
-                            echo "Failed to create .env file"
-                            exit 1
-                        fi
-                    '''
+                        '''
+                    }
                 }
             }
         }
