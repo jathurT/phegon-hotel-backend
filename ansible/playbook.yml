@@ -52,7 +52,7 @@
         - "{{ app_dir }}/prometheus"
         - "{{ app_dir }}/grafana/provisioning/dashboards"
         - "{{ app_dir }}/grafana/provisioning/datasources"
-        - "/var/www/html"
+        - "/var/www/frontends"
 
     - name: Remove default Nginx site
       file:
