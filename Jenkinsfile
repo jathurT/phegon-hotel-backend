@@ -11,6 +11,7 @@ pipeline {
         string(name: 'SERVER_PORT', defaultValue: '8081', description: 'Port for the application to run on EC2')
         string(name: 'MYSQL_PORT', defaultValue: '3306', description: 'Port for MySQL to run on EC2')
         booleanParam(name: 'PROVISION_INFRASTRUCTURE', defaultValue: false, description: 'Provision new infrastructure with Terraform')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip running tests')
     }
 
     environment {
@@ -26,6 +27,8 @@ pipeline {
         MYSQL_PORT = "${params.MYSQL_PORT}"
         TERRAFORM_DIR = "${WORKSPACE}/terraform"
         ANSIBLE_DIR = "${WORKSPACE}/ansible"
+        SONAR_PROJECT_KEY = "com.phegondev:PhegonHotel"
+        SONAR_PROJECT_NAME = "PhegonHotel"
     }
 
     stages {
@@ -41,6 +44,50 @@ pipeline {
                 sh './mvnw clean package -DskipTests --no-transfer-progress'
             }
         }
+
+        stage('Test') {
+            when {
+                expression { return !params.SKIP_TESTS }
+            }
+            steps {
+                sh './mvnw test --no-transfer-progress'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+//         stage('SonarQube Analysis') {
+//             environment {
+//                 SONAR_CREDENTIALS = credentials('sonar-token')
+//             }
+//             steps {
+//                 withSonarQubeEnv('SonarQube') {
+//                     sh '''
+//                         ./mvnw sonar:sonar \
+//                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+//                         -Dsonar.projectName=${SONAR_PROJECT_NAME} \
+//                         -Dsonar.host.url=${SONAR_HOST_URL} \
+//                         -Dsonar.login=${SONAR_CREDENTIALS} \
+//                         -Dsonar.java.coveragePlugin=jacoco \
+//                         -Dsonar.junit.reportsPath=target/surefire-reports \
+//                         -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+//                         -Dsonar.java.binaries=target/classes \
+//                         -Dsonar.sources=src/main/java
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Quality Gate') {
+//             steps {
+//                 timeout(time: 2, unit: 'MINUTES') {
+//                     waitForQualityGate abortPipeline: true
+//                 }
+//             }
+//         }
 
         stage('Prepare .env File') {
             steps {
