@@ -15,8 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -88,60 +90,58 @@ public class BookingServiceTest {
     testBooking.setUser(testUser);
   }
 
-//  @Test
-//  public void testSaveBooking_Success() {
-//    // Arrange
-//    when(roomRepository.findById(anyLong())).thenReturn(Optional.of(testRoom));
-//    when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
-//    when(bookingRepository.save(any(Booking.class))).thenReturn(testBooking);
-//
-//    // Mock Timer.Sample for metrics
-//    try (var staticMock = mockStatic(Timer.class)) {
-//      staticMock.when(Timer::start).thenReturn(timerSample);
-//      doNothing().when(timerSample).stop(any(Timer.class));
-//
-//      // Act
-//      Response response = bookingService.saveBooking(1L, 1L, testBooking);
-//
-//      // Assert
-//      assertEquals(200, response.getStatusCode());
-//      assertEquals("successful", response.getMessage());
-//      assertNotNull(response.getBookingConfirmationCode());
-//
-//      verify(roomRepository).findById(1L);
-//      verify(userRepository).findById(1L);
-//      verify(bookingRepository).save(any(Booking.class));
-//      verify(createBookingCounter).increment();
-//      verify(createBookingErrorCounter, never()).increment();
-//      verify(timerSample).stop(createBookingTimer);
-//    }
-//  }
+  @Test
+  public void testSaveBooking_Success() {
+    // Arrange
+    when(roomRepository.findById(anyLong())).thenReturn(Optional.of(testRoom));
+    when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+    when(bookingRepository.save(any(Booking.class))).thenReturn(testBooking);
 
-//  @Test
-//  public void testSaveBooking_RoomNotFound() {
-//    // Arrange
-//    when(roomRepository.findById(anyLong())).thenReturn(Optional.empty());
-//
-//    // Mock Timer.Sample for metrics
-//    try (var staticMock = mockStatic(Timer.class)) {
-//      staticMock.when(Timer::start).thenReturn(timerSample);
-//      doNothing().when(timerSample).stop(any(Timer.class));
-//
-//      // Act
-//      Response response = bookingService.saveBooking(1L, 1L, testBooking);
-//
-//      // Assert
-//      assertEquals(404, response.getStatusCode());
-//      assertEquals("Room Not Found", response.getMessage());
-//
-//      verify(roomRepository).findById(1L);
-//      verify(userRepository, never()).findById(anyLong());
-//      verify(bookingRepository, never()).save(any(Booking.class));
-//      verify(createBookingCounter, never()).increment();
-//      verify(createBookingErrorCounter).increment();
-//      verify(timerSample).stop(createBookingTimer);
-//    }
-//  }
+    // Mock Timer.Sample for metrics
+    try (MockedStatic<Timer> timerMock = mockStatic(Timer.class)) {
+      timerMock.when(Timer::start).thenReturn(timerSample);
+
+      // Act
+      Response response = bookingService.saveBooking(1L, 1L, testBooking);
+
+      // Assert
+      assertEquals(200, response.getStatusCode());
+      assertEquals("successful", response.getMessage());
+      assertNotNull(response.getBookingConfirmationCode());
+
+      verify(roomRepository).findById(1L);
+      verify(userRepository).findById(1L);
+      verify(bookingRepository).save(any(Booking.class));
+      verify(createBookingCounter).increment();
+      verify(createBookingErrorCounter, never()).increment();
+      verify(timerSample).stop(createBookingTimer);
+    }
+  }
+
+  @Test
+  public void testSaveBooking_RoomNotFound() {
+    // Arrange
+    when(roomRepository.findById(anyLong())).thenReturn(Optional.empty());
+
+    // Mock Timer.Sample for metrics
+    try (MockedStatic<Timer> timerMock = mockStatic(Timer.class)) {
+      timerMock.when(Timer::start).thenReturn(timerSample);
+
+      // Act
+      Response response = bookingService.saveBooking(1L, 1L, testBooking);
+
+      // Assert
+      assertEquals(404, response.getStatusCode());
+      assertEquals("Room Not Found", response.getMessage());
+
+      verify(roomRepository).findById(1L);
+      verify(userRepository, never()).findById(anyLong());
+      verify(bookingRepository, never()).save(any(Booking.class));
+      verify(createBookingCounter, never()).increment();
+      verify(createBookingErrorCounter).increment();
+      verify(timerSample).stop(createBookingTimer);
+    }
+  }
 
 //  @Test
 //  public void testSaveBooking_CheckOutBeforeCheckIn() {
@@ -150,9 +150,8 @@ public class BookingServiceTest {
 //    testBooking.setCheckOutDate(LocalDate.now().plusDays(1));
 //
 //    // Mock Timer.Sample for metrics
-//    try (var staticMock = mockStatic(Timer.class)) {
-//      staticMock.when(Timer::start).thenReturn(timerSample);
-//      doNothing().when(timerSample).stop(any(Timer.class));
+//    try (MockedStatic<Timer> timerMock = mockStatic(Timer.class)) {
+//      timerMock.when(Timer::start).thenReturn(timerSample);
 //
 //      // Act
 //      Response response = bookingService.saveBooking(1L, 1L, testBooking);
@@ -199,42 +198,42 @@ public class BookingServiceTest {
     verify(bookingRepository).findByBookingConfirmationCode(confirmationCode);
   }
 
-//  @Test
-//  public void testGetAllBookings_Success() {
-//    // Arrange
-//    List<Booking> bookings = new ArrayList<>();
-//    bookings.add(testBooking);
-//    when(bookingRepository.findAll((Example<Booking>) any())).thenReturn(bookings);
-//
-//    // Act
-//    Response response = bookingService.getAllBookings();
-//
-//    // Assert
-//    assertEquals(200, response.getStatusCode());
-//    assertEquals("successful", response.getMessage());
-//    assertNotNull(response.getBookingList());
-//    assertEquals(1, response.getBookingList().size());
-//
-//    verify(bookingRepository).findAll((Example<Booking>) any());
-//  }
-//
-//  @Test
-//  public void testCancelBooking_Success() {
-//    // Arrange
-//    Long bookingId = 1L;
-//    when(bookingRepository.findById(anyLong())).thenReturn(Optional.of(testBooking));
-//    doNothing().when(bookingRepository).deleteById(anyLong());
-//
-//    // Act
-//    Response response = bookingService.cancelBooking(bookingId);
-//
-//    // Assert
-//    assertEquals(200, response.getStatusCode());
-//    assertEquals("successful", response.getMessage());
-//
-//    verify(bookingRepository).findById(bookingId);
-//    verify(bookingRepository).deleteById(bookingId);
-//  }
+  @Test
+  public void testGetAllBookings_Success() {
+    // Arrange
+    List<Booking> bookings = new ArrayList<>();
+    bookings.add(testBooking);
+    when(bookingRepository.findAll(any(Sort.class))).thenReturn(bookings);
+
+    // Act
+    Response response = bookingService.getAllBookings();
+
+    // Assert
+    assertEquals(200, response.getStatusCode());
+    assertEquals("successful", response.getMessage());
+    assertNotNull(response.getBookingList());
+    assertEquals(1, response.getBookingList().size());
+
+    verify(bookingRepository).findAll(any(Sort.class));
+  }
+
+  @Test
+  public void testCancelBooking_Success() {
+    // Arrange
+    Long bookingId = 1L;
+    when(bookingRepository.findById(anyLong())).thenReturn(Optional.of(testBooking));
+    doNothing().when(bookingRepository).delete(any(Booking.class));
+
+    // Act
+    Response response = bookingService.cancelBooking(bookingId);
+
+    // Assert
+    assertEquals(200, response.getStatusCode());
+    assertEquals("successful", response.getMessage());
+
+    verify(bookingRepository).findById(bookingId);
+    verify(bookingRepository).delete(any(Booking.class));
+  }
 
   @Test
   public void testCancelBooking_NotFound() {

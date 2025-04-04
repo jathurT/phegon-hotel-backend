@@ -67,25 +67,35 @@ public class UserServiceTest {
     loginRequest.setPassword("password");
   }
 
-//  @Test
-//  public void testRegister_Success() {
-//    // Arrange
-//    when(userRepository.existsByEmail(anyString())).thenReturn(false);
-//    when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
-//    when(userRepository.save(any(User.class))).thenReturn(testUser);
-//
-//    // Act
-//    Response response = userService.register(testUser);
-//
-//    // Assert
-//    assertEquals(200, response.getStatusCode());
-//    assertNotNull(response.getUser());
-//    assertEquals(testUser.getEmail(), response.getUser().getEmail());
-//
-//    verify(userRepository).existsByEmail(testUser.getEmail());
-//    verify(passwordEncoder).encode(testUser.getPassword());
-//    verify(userRepository).save(testUser);
-//  }
+  @Test
+  public void testRegister_Success() {
+    // Arrange
+    when(userRepository.existsByEmail(anyString())).thenReturn(false);
+    when(passwordEncoder.encode("rawPassword")).thenReturn("encodedPassword");
+
+    // Create a saved user copy that will be returned by save()
+    User savedUser = new User();
+    savedUser.setId(1L);
+    savedUser.setEmail("test@example.com");
+    savedUser.setName("Test User");
+    savedUser.setPhoneNumber("1234567890");
+    savedUser.setPassword("encodedPassword"); // Encoded password
+    savedUser.setRole("USER");
+
+    when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+    // Act
+    Response response = userService.register(testUser);
+
+    // Assert
+    assertEquals(200, response.getStatusCode());
+    assertNotNull(response.getUser());
+    assertEquals(testUser.getEmail(), response.getUser().getEmail());
+
+    verify(userRepository).existsByEmail(testUser.getEmail());
+    verify(passwordEncoder).encode("rawPassword");
+    verify(userRepository).save(any(User.class));
+  }
 
   @Test
   public void testRegister_UserAlreadyExists() {
@@ -198,22 +208,22 @@ public class UserServiceTest {
     verify(userRepository).findById(1L);
   }
 
-//  @Test
-//  public void testDeleteUser_Success() {
-//    // Arrange
-//    when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
-//    doNothing().when(userRepository).deleteById(anyLong());
-//
-//    // Act
-//    Response response = userService.deleteUser("1");
-//
-//    // Assert
-//    assertEquals(200, response.getStatusCode());
-//    assertEquals("successful", response.getMessage());
-//
-//    verify(userRepository).findById(1L);
-//    verify(userRepository).deleteById(1L);
-//  }
+  @Test
+  public void testDeleteUser_Success() {
+    // Arrange
+    when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+    doNothing().when(userRepository).delete(any(User.class));
+
+    // Act
+    Response response = userService.deleteUser("1");
+
+    // Assert
+    assertEquals(200, response.getStatusCode());
+    assertEquals("successful", response.getMessage());
+
+    verify(userRepository).findById(1L);
+    verify(userRepository).delete(testUser);
+  }
 
   @Test
   public void testDeleteUser_UserNotFound() {
