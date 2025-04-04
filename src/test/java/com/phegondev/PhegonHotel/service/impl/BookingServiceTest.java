@@ -8,6 +8,7 @@ import com.phegondev.PhegonHotel.repo.BookingRepository;
 import com.phegondev.PhegonHotel.repo.RoomRepository;
 import com.phegondev.PhegonHotel.repo.UserRepository;
 import com.phegondev.PhegonHotel.service.interfac.IRoomService;
+import com.phegondev.PhegonHotel.utils.Utils;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import org.junit.jupiter.api.BeforeEach;
@@ -137,7 +138,33 @@ public class BookingServiceTest {
       verify(userRepository, never()).findById(anyLong());
       verify(bookingRepository, never()).save(any(Booking.class));
       verify(createBookingCounter, never()).increment();
-      verify(createBookingErrorCounter).increment();
+      verify(createBookingErrorCounter, times(1)).increment(); // Updated to expect only 1 call
+      verify(timerSample).stop(createBookingTimer);
+    }
+  }
+
+  @Test
+  public void testSaveBooking_UserNotFound() {
+    // Arrange
+    when(roomRepository.findById(anyLong())).thenReturn(Optional.of(testRoom));
+    when(userRepository.findById(anyLong())).thenReturn(Optional.empty());
+
+    // Mock Timer.Sample for metrics
+    try (MockedStatic<Timer> timerMock = mockStatic(Timer.class)) {
+      timerMock.when(Timer::start).thenReturn(timerSample);
+
+      // Act
+      Response response = bookingService.saveBooking(1L, 1L, testBooking);
+
+      // Assert
+      assertEquals(404, response.getStatusCode());
+      assertEquals("User Not Found", response.getMessage());
+
+      verify(roomRepository).findById(1L);
+      verify(userRepository).findById(1L);
+      verify(bookingRepository, never()).save(any(Booking.class));
+      verify(createBookingCounter, never()).increment();
+      verify(createBookingErrorCounter, times(1)).increment(); // Expecting only 1 call here
       verify(timerSample).stop(createBookingTimer);
     }
   }
@@ -164,6 +191,77 @@ public class BookingServiceTest {
       // Updated to verify that createBookingErrorCounter is called twice
       verify(createBookingErrorCounter, times(2)).increment();
       verify(timerSample).stop(createBookingTimer);
+    }
+  }
+
+  @Test
+  public void testSaveBooking_RoomNotAvailable() {
+    // Arrange
+    Room room = new Room();
+    room.setId(1L);
+    room.setRoomType("STANDARD");
+
+    // Create an existing booking that conflicts with the test booking
+    Booking existingBooking = new Booking();
+    existingBooking.setCheckInDate(testBooking.getCheckInDate());
+    existingBooking.setCheckOutDate(testBooking.getCheckOutDate());
+
+    List<Booking> bookings = new ArrayList<>();
+    bookings.add(existingBooking);
+    room.setBookings(bookings);
+
+    when(roomRepository.findById(anyLong())).thenReturn(Optional.of(room));
+    when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+
+    // Mock Timer.Sample for metrics
+    try (MockedStatic<Timer> timerMock = mockStatic(Timer.class)) {
+      timerMock.when(Timer::start).thenReturn(timerSample);
+
+      // Act
+      Response response = bookingService.saveBooking(1L, 1L, testBooking);
+
+      // Assert
+      assertEquals(404, response.getStatusCode());
+      assertEquals("Room not Available for selected date range", response.getMessage());
+
+      verify(roomRepository).findById(1L);
+      verify(userRepository).findById(1L);
+      verify(bookingRepository, never()).save(any(Booking.class));
+      verify(createBookingCounter, never()).increment();
+      verify(createBookingErrorCounter, times(2)).increment(); // Updated to expect 2 calls
+      verify(timerSample).stop(createBookingTimer);
+    }
+  }
+
+  @Test
+  public void testSaveBooking_GeneralException() {
+    // Arrange
+    when(roomRepository.findById(anyLong())).thenReturn(Optional.of(testRoom));
+    when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+    when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Database error"));
+
+    // Mock Timer.Sample for metrics
+    try (MockedStatic<Timer> timerMock = mockStatic(Timer.class)) {
+      timerMock.when(Timer::start).thenReturn(timerSample);
+
+      // Mock Utils.generateRandomConfirmationCode to avoid null pointer
+      try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class)) {
+        utilsMock.when(() -> Utils.generateRandomConfirmationCode(anyInt())).thenReturn("TEST1234");
+
+        // Act
+        Response response = bookingService.saveBooking(1L, 1L, testBooking);
+
+        // Assert
+        assertEquals(500, response.getStatusCode());
+        assertTrue(response.getMessage().contains("Error Saving a booking"));
+
+        verify(roomRepository).findById(1L);
+        verify(userRepository).findById(1L);
+        verify(bookingRepository).save(any(Booking.class));
+        verify(createBookingCounter, never()).increment();
+        verify(createBookingErrorCounter).increment();
+        verify(timerSample).stop(createBookingTimer);
+      }
     }
   }
 
@@ -201,6 +299,22 @@ public class BookingServiceTest {
   }
 
   @Test
+  public void testFindBookingByConfirmationCode_Exception() {
+    // Arrange
+    String confirmationCode = "EXCEPTION";
+    when(bookingRepository.findByBookingConfirmationCode(anyString())).thenThrow(new RuntimeException("Database error"));
+
+    // Act
+    Response response = bookingService.findBookingByConfirmationCode(confirmationCode);
+
+    // Assert
+    assertEquals(500, response.getStatusCode());
+    assertTrue(response.getMessage().contains("Error Finding a booking"));
+
+    verify(bookingRepository).findByBookingConfirmationCode(confirmationCode);
+  }
+
+  @Test
   public void testGetAllBookings_Success() {
     // Arrange
     List<Booking> bookings = new ArrayList<>();
@@ -215,6 +329,39 @@ public class BookingServiceTest {
     assertEquals("successful", response.getMessage());
     assertNotNull(response.getBookingList());
     assertEquals(1, response.getBookingList().size());
+
+    verify(bookingRepository).findAll(any(Sort.class));
+  }
+
+  @Test
+  public void testGetAllBookings_EmptyList() {
+    // Arrange
+    List<Booking> bookings = new ArrayList<>();
+    when(bookingRepository.findAll(any(Sort.class))).thenReturn(bookings);
+
+    // Act
+    Response response = bookingService.getAllBookings();
+
+    // Assert
+    assertEquals(200, response.getStatusCode());
+    assertEquals("successful", response.getMessage());
+    assertNotNull(response.getBookingList());
+    assertEquals(0, response.getBookingList().size());
+
+    verify(bookingRepository).findAll(any(Sort.class));
+  }
+
+  @Test
+  public void testGetAllBookings_Exception() {
+    // Arrange
+    when(bookingRepository.findAll(any(Sort.class))).thenThrow(new RuntimeException("Database error"));
+
+    // Act
+    Response response = bookingService.getAllBookings();
+
+    // Assert
+    assertEquals(500, response.getStatusCode());
+    assertTrue(response.getMessage().contains("Error Getting all bookings"));
 
     verify(bookingRepository).findAll(any(Sort.class));
   }
@@ -253,6 +400,24 @@ public class BookingServiceTest {
     verify(bookingRepository).findById(bookingId);
     verify(bookingRepository, never()).deleteById(anyLong());
     verify(bookingRepository, never()).delete(any(Booking.class));
+  }
+
+  @Test
+  public void testCancelBooking_Exception() {
+    // Arrange
+    Long bookingId = 1L;
+    when(bookingRepository.findById(anyLong())).thenReturn(Optional.of(testBooking));
+    doThrow(new RuntimeException("Database error")).when(bookingRepository).delete(any(Booking.class));
+
+    // Act
+    Response response = bookingService.cancelBooking(bookingId);
+
+    // Assert
+    assertEquals(500, response.getStatusCode());
+    assertTrue(response.getMessage().contains("Error Cancelling a booking"));
+
+    verify(bookingRepository).findById(bookingId);
+    verify(bookingRepository).delete(any(Booking.class));
   }
 
   @Test
@@ -297,6 +462,113 @@ public class BookingServiceTest {
 
     // Assert
     assertFalse(result);
+  }
+
+  @Test
+  public void testRoomIsAvailable_False_CheckInDuringExistingStay() {
+    // Create a new booking with check-in during an existing booking's stay
+    Booking newBooking = new Booking();
+    newBooking.setCheckInDate(LocalDate.now().plusDays(2)); // During existing booking
+    newBooking.setCheckOutDate(LocalDate.now().plusDays(5));
+
+    // Create an existing booking
+    Booking existingBooking = new Booking();
+    existingBooking.setCheckInDate(LocalDate.now().plusDays(1));
+    existingBooking.setCheckOutDate(LocalDate.now().plusDays(4));
+
+    List<Booking> existingBookings = new ArrayList<>();
+    existingBookings.add(existingBooking);
+
+    // Using reflection to test private method
+    boolean result = invokeRoomIsAvailable(bookingService, newBooking, existingBookings);
+
+    // Assert
+    assertFalse(result);
+  }
+
+  @Test
+  public void testRoomIsAvailable_False_CheckOutSameAsExistingCheckOut() {
+    // Create a new booking with check-out on same day as existing booking check-out
+    Booking newBooking = new Booking();
+    newBooking.setCheckInDate(LocalDate.now());
+    newBooking.setCheckOutDate(LocalDate.now().plusDays(3)); // Same as existing checkout
+
+    // Create an existing booking
+    Booking existingBooking = new Booking();
+    existingBooking.setCheckInDate(LocalDate.now().plusDays(1));
+    existingBooking.setCheckOutDate(LocalDate.now().plusDays(3));
+
+    List<Booking> existingBookings = new ArrayList<>();
+    existingBookings.add(existingBooking);
+
+    // Using reflection to test private method
+    boolean result = invokeRoomIsAvailable(bookingService, newBooking, existingBookings);
+
+    // Assert
+    assertFalse(result);
+  }
+
+  @Test
+  public void testRoomIsAvailable_False_BookingSpansExistingBooking() {
+    // Create a new booking that entirely spans an existing booking
+    Booking newBooking = new Booking();
+    newBooking.setCheckInDate(LocalDate.now());
+    newBooking.setCheckOutDate(LocalDate.now().plusDays(10));
+
+    // Create an existing booking
+    Booking existingBooking = new Booking();
+    existingBooking.setCheckInDate(LocalDate.now().plusDays(2));
+    existingBooking.setCheckOutDate(LocalDate.now().plusDays(5));
+
+    List<Booking> existingBookings = new ArrayList<>();
+    existingBookings.add(existingBooking);
+
+    // Using reflection to test private method
+    boolean result = invokeRoomIsAvailable(bookingService, newBooking, existingBookings);
+
+    // Assert
+    assertFalse(result);
+  }
+
+  @Test
+  public void testRoomIsAvailable_CheckInEqualsCheckOut() {
+    // Create a new booking with check-in on the check-out day of existing booking
+    Booking newBooking = new Booking();
+    newBooking.setCheckInDate(LocalDate.now().plusDays(3)); // Same as existing checkout
+    newBooking.setCheckOutDate(LocalDate.now().plusDays(5));
+
+    // Create an existing booking
+    Booking existingBooking = new Booking();
+    existingBooking.setCheckInDate(LocalDate.now().plusDays(1));
+    existingBooking.setCheckOutDate(LocalDate.now().plusDays(3));
+
+    List<Booking> existingBookings = new ArrayList<>();
+    existingBookings.add(existingBooking);
+
+    // Using reflection to test private method
+    boolean result = invokeRoomIsAvailable(bookingService, newBooking, existingBookings);
+
+    // Assert
+    // After examining the implementation, it appears check-in on check-out day is allowed
+    // so we're expecting true here
+    assertTrue(result);
+  }
+
+  @Test
+  public void testRoomIsAvailable_EmptyExistingBookings() {
+    // Create a new booking
+    Booking newBooking = new Booking();
+    newBooking.setCheckInDate(LocalDate.now().plusDays(1));
+    newBooking.setCheckOutDate(LocalDate.now().plusDays(3));
+
+    // Empty list of existing bookings
+    List<Booking> existingBookings = new ArrayList<>();
+
+    // Using reflection to test private method
+    boolean result = invokeRoomIsAvailable(bookingService, newBooking, existingBookings);
+
+    // Assert
+    assertTrue(result);
   }
 
   // Helper method to invoke private roomIsAvailable method using reflection

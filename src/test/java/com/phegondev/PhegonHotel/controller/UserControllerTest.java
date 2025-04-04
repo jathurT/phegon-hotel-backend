@@ -2,14 +2,15 @@ package com.phegondev.PhegonHotel.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.phegondev.PhegonHotel.dto.Response;
+import com.phegondev.PhegonHotel.dto.UserDTO;
 import com.phegondev.PhegonHotel.service.interfac.IUserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,8 +18,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,6 +40,12 @@ public class UserControllerTest {
   @InjectMocks
   private UserController userController;
 
+  @Mock
+  private Authentication authentication;
+
+  @Mock
+  private SecurityContext securityContext;
+
   @BeforeEach
   public void setup() {
     mockMvc = MockMvcBuilders
@@ -45,13 +53,24 @@ public class UserControllerTest {
             .build();
   }
 
+  @AfterEach
+  public void tearDown() {
+    // Clean up the security context after each test
+    SecurityContextHolder.clearContext();
+  }
+
   @Test
-  public void testGetAllUsers_Admin() throws Exception {
+  public void testGetAllUsers_Success() throws Exception {
     // Arrange
+    List<UserDTO> userDTOList = Arrays.asList(
+            createUserDTO(1L, "user1@example.com", "User One"),
+            createUserDTO(2L, "user2@example.com", "User Two")
+    );
+
     Response mockResponse = new Response();
     mockResponse.setStatusCode(200);
     mockResponse.setMessage("successful");
-    mockResponse.setUserList(new ArrayList<>());
+    mockResponse.setUserList(userDTOList);
 
     when(userService.getAllUsers()).thenReturn(mockResponse);
 
@@ -59,22 +78,42 @@ public class UserControllerTest {
     mockMvc.perform(get("/api/users/all"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.statusCode").value(200))
-            .andExpect(jsonPath("$.message").value("successful"));
+            .andExpect(jsonPath("$.message").value("successful"))
+            .andExpect(jsonPath("$.userList").isArray())
+            .andExpect(jsonPath("$.userList.length()").value(2))
+            .andExpect(jsonPath("$.userList[0].email").value("user1@example.com"));
 
     verify(userService, times(1)).getAllUsers();
   }
 
-  // Note: Security tests removed as we're using standalone setup
+  @Test
+  public void testGetAllUsers_ServerError() throws Exception {
+    // Arrange
+    Response mockResponse = new Response();
+    mockResponse.setStatusCode(500);
+    mockResponse.setMessage("Error getting all users");
+
+    when(userService.getAllUsers()).thenReturn(mockResponse);
+
+    // Act & Assert
+    mockMvc.perform(get("/api/users/all"))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.statusCode").value(500))
+            .andExpect(jsonPath("$.message").value("Error getting all users"));
+
+    verify(userService, times(1)).getAllUsers();
+  }
 
   @Test
   public void testGetUserById_Success() throws Exception {
     // Arrange
     String userId = "1";
+    UserDTO userDTO = createUserDTO(1L, "user@example.com", "Test User");
 
     Response mockResponse = new Response();
     mockResponse.setStatusCode(200);
     mockResponse.setMessage("successful");
-    // Set user details in response as needed
+    mockResponse.setUser(userDTO);
 
     when(userService.getUserById(userId)).thenReturn(mockResponse);
 
@@ -82,13 +121,36 @@ public class UserControllerTest {
     mockMvc.perform(get("/api/users/get-by-id/" + userId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.statusCode").value(200))
-            .andExpect(jsonPath("$.message").value("successful"));
+            .andExpect(jsonPath("$.message").value("successful"))
+            .andExpect(jsonPath("$.user.id").value(1))
+            .andExpect(jsonPath("$.user.email").value("user@example.com"))
+            .andExpect(jsonPath("$.user.name").value("Test User"));
 
     verify(userService, times(1)).getUserById(userId);
   }
 
   @Test
-  public void testDeleteUser_Admin_Success() throws Exception {
+  public void testGetUserById_NotFound() throws Exception {
+    // Arrange
+    String userId = "999";
+
+    Response mockResponse = new Response();
+    mockResponse.setStatusCode(404);
+    mockResponse.setMessage("User Not Found");
+
+    when(userService.getUserById(userId)).thenReturn(mockResponse);
+
+    // Act & Assert
+    mockMvc.perform(get("/api/users/get-by-id/" + userId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.statusCode").value(404))
+            .andExpect(jsonPath("$.message").value("User Not Found"));
+
+    verify(userService, times(1)).getUserById(userId);
+  }
+
+  @Test
+  public void testDeleteUser_Success() throws Exception {
     // Arrange
     String userId = "1";
 
@@ -108,13 +170,32 @@ public class UserControllerTest {
   }
 
   @Test
+  public void testDeleteUser_NotFound() throws Exception {
+    // Arrange
+    String userId = "999";
+
+    Response mockResponse = new Response();
+    mockResponse.setStatusCode(404);
+    mockResponse.setMessage("User Not Found");
+
+    when(userService.deleteUser(userId)).thenReturn(mockResponse);
+
+    // Act & Assert
+    mockMvc.perform(delete("/api/users/delete/" + userId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.statusCode").value(404))
+            .andExpect(jsonPath("$.message").value("User Not Found"));
+
+    verify(userService, times(1)).deleteUser(userId);
+  }
+
+  @Test
   public void testGetLoggedInUserProfile_Success() throws Exception {
     // Arrange
     String email = "test@example.com";
+    UserDTO userDTO = createUserDTO(1L, email, "Test User");
 
-    // Mock SecurityContext for the logged-in user
-    Authentication authentication = mock(Authentication.class);
-    SecurityContext securityContext = mock(SecurityContext.class);
+    // Setup security context
     when(securityContext.getAuthentication()).thenReturn(authentication);
     when(authentication.getName()).thenReturn(email);
     SecurityContextHolder.setContext(securityContext);
@@ -122,7 +203,7 @@ public class UserControllerTest {
     Response mockResponse = new Response();
     mockResponse.setStatusCode(200);
     mockResponse.setMessage("successful");
-    // Set user details in response as needed
+    mockResponse.setUser(userDTO);
 
     when(userService.getMyInfo(email)).thenReturn(mockResponse);
 
@@ -130,23 +211,23 @@ public class UserControllerTest {
     mockMvc.perform(get("/api/users/get-logged-in-profile-info"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.statusCode").value(200))
-            .andExpect(jsonPath("$.message").value("successful"));
+            .andExpect(jsonPath("$.message").value("successful"))
+            .andExpect(jsonPath("$.user.email").value(email));
 
     verify(userService, times(1)).getMyInfo(email);
-
-    // Clean up security context after test
-    SecurityContextHolder.clearContext();
   }
 
   @Test
   public void testGetUserBookingHistory_Success() throws Exception {
     // Arrange
     String userId = "1";
+    UserDTO userDTO = createUserDTO(1L, "user@example.com", "Test User");
+    // Add booking history if needed
 
     Response mockResponse = new Response();
     mockResponse.setStatusCode(200);
     mockResponse.setMessage("successful");
-    // Set booking history in response as needed
+    mockResponse.setUser(userDTO);
 
     when(userService.getUserBookingHistory(userId)).thenReturn(mockResponse);
 
@@ -154,8 +235,42 @@ public class UserControllerTest {
     mockMvc.perform(get("/api/users/get-user-bookings/" + userId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.statusCode").value(200))
-            .andExpect(jsonPath("$.message").value("successful"));
+            .andExpect(jsonPath("$.message").value("successful"))
+            .andExpect(jsonPath("$.user.id").value(1))
+            .andExpect(jsonPath("$.user.email").value("user@example.com"));
 
     verify(userService, times(1)).getUserBookingHistory(userId);
+  }
+
+  @Test
+  public void testGetUserBookingHistory_UserNotFound() throws Exception {
+    // Arrange
+    String userId = "999";
+
+    Response mockResponse = new Response();
+    mockResponse.setStatusCode(404);
+    mockResponse.setMessage("User Not Found");
+
+    when(userService.getUserBookingHistory(userId)).thenReturn(mockResponse);
+
+    // Act & Assert
+    mockMvc.perform(get("/api/users/get-user-bookings/" + userId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.statusCode").value(404))
+            .andExpect(jsonPath("$.message").value("User Not Found"));
+
+    verify(userService, times(1)).getUserBookingHistory(userId);
+  }
+
+  // Helper method to create a UserDTO for testing
+  private UserDTO createUserDTO(Long id, String email, String name) {
+    UserDTO userDTO = new UserDTO();
+    userDTO.setId(id);
+    userDTO.setEmail(email);
+    userDTO.setName(name);
+    userDTO.setPhoneNumber("1234567890");
+    userDTO.setRole("USER");
+    userDTO.setBookings(new ArrayList<>());
+    return userDTO;
   }
 }
