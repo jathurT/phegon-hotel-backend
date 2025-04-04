@@ -19,7 +19,10 @@ pipeline {
         DB_CREDENTIALS = credentials('db-credentials')
         MYSQL_ROOT_PASSWORD = credentials('mysql-root-password')
         DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
+        ADMIN_PASSWORD = credentials('admin-password')
+        ADMIN_USERNAME = credentials('admin-username')
         DOCKER_IMAGE = "jathurt/myapp-backend-hotel-bookings"
+        JWT_SECRET = credentials('jwt-secret')
 //         EC2_HOST = credentials('ec2-host-hotel')
         EC2_USER = 'ubuntu'
         DEPLOY_ENV = "${params.DEPLOY_ENV ?: 'staging'}"
@@ -113,10 +116,13 @@ SPRING_DATASOURCE_USERNAME=${DB_CREDENTIALS_USR}
 SPRING_DATASOURCE_PASSWORD=${DB_CREDENTIALS_PSW}
 SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
 SPRING_JPA_SHOW_SQL=false
+SPRING_APP_JWTSECRET=${JWT_SECRET}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=eu-north-1
 AWS_S3_BUCKET=phegon-hotel-images-jathur
+SPRING_APP_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+SPRING_APP_ADMIN_USERNAME=${ADMIN_USERNAME}
 EOL
                         '''
                     }

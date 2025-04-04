@@ -4,6 +4,7 @@ import com.phegondev.PhegonHotel.entity.User;
 import com.phegondev.PhegonHotel.repo.UserRepository;
 import com.phegondev.PhegonHotel.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,17 +34,24 @@ public class SecurityConfig {
   @Autowired
   private JWTAuthFilter jwtAuthFilter;
 
+  @Value("${spring.app.admin.email}")
+  private String adminEmail;
+
+  @Value("${spring.app.admin.password}")
+  private String adminPassword;
+
+
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
     httpSecurity.csrf(AbstractHttpConfigurer::disable)
-        .cors(Customizer.withDefaults())
-        .authorizeHttpRequests(request -> request
-            .requestMatchers("/api/auth/**", "/api/rooms/**", "/api/bookings/**").permitAll()
-            .requestMatchers("/actuator/**").permitAll()
-            .anyRequest().authenticated())
-        .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authenticationProvider(authenticationProvider())
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .cors(Customizer.withDefaults())
+            .authorizeHttpRequests(request -> request
+                    .requestMatchers("/api/auth/**", "/api/rooms/**", "/api/bookings/**").permitAll()
+                    .requestMatchers("/actuator/**").permitAll()
+                    .anyRequest().authenticated())
+            .sessionManagement(manager -> manager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return httpSecurity.build();
   }
@@ -69,15 +77,16 @@ public class SecurityConfig {
   @Bean
   public CommandLineRunner initDatabase(UserRepository userRepository) {
     return args -> {
-      if (userRepository.findByEmail("admin@gmail.com").isEmpty()) {
+      if (userRepository.findByEmail(adminEmail).isEmpty()) {
         User user = new User();
-        user.setName("Phegon");
-        user.setPhoneNumber("08012345678");
-        user.setEmail("admin@gmail.com");
-        user.setPassword(passwordEncoder().encode("admin"));
+        user.setName("Admin");
+        user.setPhoneNumber("+2349012345678");
+        user.setEmail(adminEmail);
+        user.setPassword(passwordEncoder().encode(adminPassword));
         user.setRole("ADMIN");
         userRepository.save(user);
       }
     };
   }
+
 }
