@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 resource "aws_security_group" "web_app_sg" {
-  name        = "web-app-security-group"
+  name        = "web-app-security-group11"
   description = "Security group for web application"
 
   # SSH access
@@ -71,7 +71,7 @@ resource "aws_security_group" "web_app_sg" {
   }
 
   tags = {
-    Name = "WebAppSecurityGroup"
+    Name = "WebAppSecurityGroup11"
   }
 }
 
