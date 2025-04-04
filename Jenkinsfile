@@ -59,35 +59,35 @@ pipeline {
             }
         }
 
-//         stage('SonarQube Analysis') {
-//             environment {
-//                 SONAR_CREDENTIALS = credentials('sonar-token')
-//             }
-//             steps {
-//                 withSonarQubeEnv('SonarQube') {
-//                     sh '''
-//                         ./mvnw sonar:sonar \
-//                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-//                         -Dsonar.projectName=${SONAR_PROJECT_NAME} \
-//                         -Dsonar.host.url=${SONAR_HOST_URL} \
-//                         -Dsonar.login=${SONAR_CREDENTIALS} \
-//                         -Dsonar.java.coveragePlugin=jacoco \
-//                         -Dsonar.junit.reportsPath=target/surefire-reports \
-//                         -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-//                         -Dsonar.java.binaries=target/classes \
-//                         -Dsonar.sources=src/main/java
-//                     '''
-//                 }
-//             }
-//         }
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_CREDENTIALS = credentials('sonar-token')
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        ./mvnw sonar:sonar \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.projectName=${SONAR_PROJECT_NAME} \
+                        -Dsonar.host.url=http://localhost:9000 \
+                        -Dsonar.login=${SONAR_CREDENTIALS} \
+                        -Dsonar.java.coveragePlugin=jacoco \
+                        -Dsonar.junit.reportsPath=target/surefire-reports \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.sources=src/main/java
+                    '''
+                }
+            }
+        }
 
-//         stage('Quality Gate') {
-//             steps {
-//                 timeout(time: 2, unit: 'MINUTES') {
-//                     waitForQualityGate abortPipeline: true
-//                 }
-//             }
-//         }
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
 
         stage('Prepare .env File') {
             steps {
