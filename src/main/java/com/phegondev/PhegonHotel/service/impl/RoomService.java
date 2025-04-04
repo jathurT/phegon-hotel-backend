@@ -81,8 +81,12 @@ public class RoomService implements IRoomService {
         Response response = new Response();
 
         try {
-            roomRepository.findById(roomId).orElseThrow(() -> new OurException("Room Not Found"));
-            roomRepository.deleteById(roomId);
+            // Capture the returned Room object
+            Room room = roomRepository.findById(roomId).orElseThrow(() -> new OurException("Room Not Found"));
+
+            // Use the room object directly for deletion
+            roomRepository.delete(room); // or keep using deleteById(roomId)
+
             response.setStatusCode(200);
             response.setMessage("successful");
 

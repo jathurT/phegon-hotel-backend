@@ -131,8 +131,8 @@ public class UserService implements IUserService {
         Response response = new Response();
 
         try {
-            userRepository.findById(Long.valueOf(userId)).orElseThrow(() -> new OurException("User Not Found"));
-            userRepository.deleteById(Long.valueOf(userId));
+            User user = userRepository.findById(Long.valueOf(userId)).orElseThrow(() -> new OurException("User Not Found"));
+            userRepository.delete(user);
             response.setStatusCode(200);
             response.setMessage("successful");
 
