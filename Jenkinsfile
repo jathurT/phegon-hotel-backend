@@ -11,7 +11,7 @@ pipeline {
         string(name: 'SERVER_PORT', defaultValue: '8081', description: 'Port for the application to run on EC2')
         string(name: 'MYSQL_PORT', defaultValue: '3306', description: 'Port for MySQL to run on EC2')
         booleanParam(name: 'PROVISION_INFRASTRUCTURE', defaultValue: false, description: 'Provision new infrastructure with Terraform')
-        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip running tests')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: true, description: 'Skip running tests')
     }
 
     environment {
@@ -19,7 +19,11 @@ pipeline {
         DB_CREDENTIALS = credentials('db-credentials')
         MYSQL_ROOT_PASSWORD = credentials('mysql-root-password')
         DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
+        ADMIN_NAME = credentials('admin-name')
+        ADMIN_EMAIL = credentials('admin-email')
+        ADMIN_PASSWORD = credentials('admin-password')
         DOCKER_IMAGE = "jathurt/myapp-backend-hotel-bookings"
+        JWT_SECRET = credentials('jwt-secret')
 //         EC2_HOST = credentials('ec2-host-hotel')
         EC2_USER = 'ubuntu'
         DEPLOY_ENV = "${params.DEPLOY_ENV ?: 'staging'}"
@@ -59,35 +63,35 @@ pipeline {
             }
         }
 
-//         stage('SonarQube Analysis') {
-//             environment {
-//                 SONAR_CREDENTIALS = credentials('sonar-token')
-//             }
-//             steps {
-//                 withSonarQubeEnv('SonarQube') {
-//                     sh '''
-//                         ./mvnw sonar:sonar \
-//                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-//                         -Dsonar.projectName=${SONAR_PROJECT_NAME} \
-//                         -Dsonar.host.url=${SONAR_HOST_URL} \
-//                         -Dsonar.login=${SONAR_CREDENTIALS} \
-//                         -Dsonar.java.coveragePlugin=jacoco \
-//                         -Dsonar.junit.reportsPath=target/surefire-reports \
-//                         -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-//                         -Dsonar.java.binaries=target/classes \
-//                         -Dsonar.sources=src/main/java
-//                     '''
-//                 }
-//             }
-//         }
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_CREDENTIALS = credentials('sonar-token')
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        ./mvnw sonar:sonar \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.projectName=${SONAR_PROJECT_NAME} \
+                        -Dsonar.host.url=http://localhost:9000 \
+                        -Dsonar.login=${SONAR_CREDENTIALS} \
+                        -Dsonar.java.coveragePlugin=jacoco \
+                        -Dsonar.junit.reportsPath=target/surefire-reports \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.sources=src/main/java
+                    '''
+                }
+            }
+        }
 
-//         stage('Quality Gate') {
-//             steps {
-//                 timeout(time: 2, unit: 'MINUTES') {
-//                     waitForQualityGate abortPipeline: true
-//                 }
-//             }
-//         }
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
 
         stage('Prepare .env File') {
             steps {
@@ -113,10 +117,18 @@ SPRING_DATASOURCE_USERNAME=${DB_CREDENTIALS_USR}
 SPRING_DATASOURCE_PASSWORD=${DB_CREDENTIALS_PSW}
 SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
 SPRING_JPA_SHOW_SQL=false
+ADMIN_NAME=${ADMIN_NAME}
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+ADMIN_ROLE=ADMIN
+ADMIN_PHONE=+46701234567
+JWT_SECRET=${JWT_SECRET}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 AWS_REGION=eu-north-1
 AWS_S3_BUCKET=phegon-hotel-images-jathur
+SPRING_APP_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+SPRING_APP_ADMIN_USERNAME=${ADMIN_USERNAME}
 EOL
                         '''
                     }

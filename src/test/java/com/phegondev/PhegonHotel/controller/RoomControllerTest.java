@@ -83,6 +83,47 @@ public class RoomControllerTest {
   }
 
   @Test
+  public void testAddNewRoom_MissingRequiredFields() throws Exception {
+    // Arrange - empty photo file
+    MockMultipartFile emptyPhoto = new MockMultipartFile(
+            "photo", "", MediaType.IMAGE_JPEG_VALUE, new byte[0]);
+
+    // Act & Assert - Missing photo
+    mockMvc.perform(MockMvcRequestBuilders.multipart("/api/rooms/add")
+                    .file(emptyPhoto)
+                    .param("roomType", "DELUXE")
+                    .param("roomPrice", "199.99")
+                    .param("roomDescription", "Luxury room with sea view"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(photo, roomType,roomPrice)"));
+
+    // Act & Assert - Missing roomType
+    MockMultipartFile photoFile = new MockMultipartFile(
+            "photo", "room.jpg", MediaType.IMAGE_JPEG_VALUE, "photo content".getBytes());
+
+    mockMvc.perform(MockMvcRequestBuilders.multipart("/api/rooms/add")
+                    .file(photoFile)
+                    .param("roomPrice", "199.99")
+                    .param("roomDescription", "Luxury room with sea view"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(photo, roomType,roomPrice)"));
+
+    // Act & Assert - Missing roomPrice
+    mockMvc.perform(MockMvcRequestBuilders.multipart("/api/rooms/add")
+                    .file(photoFile)
+                    .param("roomType", "DELUXE")
+                    .param("roomDescription", "Luxury room with sea view"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(photo, roomType,roomPrice)"));
+
+    // Verify service was never called
+    verify(roomService, never()).addNewRoom(any(), anyString(), any(BigDecimal.class), anyString());
+  }
+
+  @Test
   public void testGetAllRooms_Success() throws Exception {
     // Arrange
     Response mockResponse = new Response();
@@ -99,6 +140,25 @@ public class RoomControllerTest {
             .andExpect(jsonPath("$.message").value("successful"));
 
     verify(roomService, times(1)).getAllRooms();
+  }
+
+  @Test
+  public void testGetAllAvailableRooms_Success() throws Exception {
+    // Arrange
+    Response mockResponse = new Response();
+    mockResponse.setStatusCode(200);
+    mockResponse.setMessage("successful");
+    mockResponse.setRoomList(new ArrayList<>());
+
+    when(roomService.getAllAvailableRooms()).thenReturn(mockResponse);
+
+    // Act & Assert
+    mockMvc.perform(get("/api/rooms/all-available-rooms"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.statusCode").value(200))
+            .andExpect(jsonPath("$.message").value("successful"));
+
+    verify(roomService, times(1)).getAllAvailableRooms();
   }
 
   @Test
@@ -167,6 +227,50 @@ public class RoomControllerTest {
   }
 
   @Test
+  public void testGetAvailableRoomsByDateAndType_MissingParameters() throws Exception {
+    // Arrange
+    LocalDate checkInDate = LocalDate.now().plusDays(1);
+    LocalDate checkOutDate = LocalDate.now().plusDays(3);
+    String roomType = "DELUXE";
+
+    // Act & Assert - Missing checkInDate
+    mockMvc.perform(get("/api/rooms/available-rooms-by-date-and-type")
+                    .param("checkOutDate", checkOutDate.toString())
+                    .param("roomType", roomType))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(checkInDate, roomType,checkOutDate)"));
+
+    // Act & Assert - Missing checkOutDate
+    mockMvc.perform(get("/api/rooms/available-rooms-by-date-and-type")
+                    .param("checkInDate", checkInDate.toString())
+                    .param("roomType", roomType))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(checkInDate, roomType,checkOutDate)"));
+
+    // Act & Assert - Missing roomType
+    mockMvc.perform(get("/api/rooms/available-rooms-by-date-and-type")
+                    .param("checkInDate", checkInDate.toString())
+                    .param("checkOutDate", checkOutDate.toString()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(checkInDate, roomType,checkOutDate)"));
+
+    // Act & Assert - Empty roomType
+    mockMvc.perform(get("/api/rooms/available-rooms-by-date-and-type")
+                    .param("checkInDate", checkInDate.toString())
+                    .param("checkOutDate", checkOutDate.toString())
+                    .param("roomType", ""))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.statusCode").value(400))
+            .andExpect(jsonPath("$.message").value("Please provide values for all fields(checkInDate, roomType,checkOutDate)"));
+
+    // Verify service was never called
+    verify(roomService, never()).getAvailableRoomsByDataAndType(any(), any(), anyString());
+  }
+
+  @Test
   public void testUpdateRoom_Success() throws Exception {
     // Arrange
     Long roomId = 1L;
@@ -201,6 +305,56 @@ public class RoomControllerTest {
 
     verify(roomService, times(1)).updateRoom(eq(roomId), eq("Updated luxury suite"), eq("SUITE"), any(BigDecimal.class), any());
   }
+
+//  @Test
+//  public void testUpdateRoom_WithoutPhoto() throws Exception {
+//    // Arrange
+//    Long roomId = 1L;
+//    MockMultipartFile emptyPhoto = new MockMultipartFile(
+//            "photo", "", MediaType.IMAGE_JPEG_VALUE, new byte[0]);
+//
+//    // Create a default response if service returns null
+//    Response mockResponse = new Response();
+//    mockResponse.setStatusCode(200);
+//    mockResponse.setMessage("successful");
+//
+//    // Ensure a non-null response is always returned
+//    when(roomService.updateRoom(
+//            eq(roomId),
+//            eq("Updated luxury suite"),
+//            eq("SUITE"),
+//            eq(BigDecimal.valueOf(299.99)),
+//            isNull()
+//    )).thenReturn(mockResponse);
+//
+//    // Act & Assert - Use PUT method explicitly for multipart
+//    MockHttpServletRequestBuilder builder = MockMvcRequestBuilders
+//            .multipart("/api/rooms/update/" + roomId)
+//            .file(emptyPhoto)
+//            .param("roomType", "SUITE")
+//            .param("roomPrice", "299.99")
+//            .param("roomDescription", "Updated luxury suite");
+//
+//    // Change to PUT method
+//    builder.with(request -> {
+//      request.setMethod("PUT");
+//      return request;
+//    });
+//
+//    mockMvc.perform(builder)
+//            .andExpect(status().isOk())
+//            .andExpect(jsonPath("$.statusCode").value(200))
+//            .andExpect(jsonPath("$.message").value("successful"));
+//
+//    // Verify that updateRoom is called with the correct parameters
+//    verify(roomService, times(1)).updateRoom(
+//            eq(roomId),
+//            eq("Updated luxury suite"),
+//            eq("SUITE"),
+//            eq(BigDecimal.valueOf(299.99)),
+//            isNull()
+//    );
+//  }
 
   @Test
   public void testDeleteRoom_Success() throws Exception {
